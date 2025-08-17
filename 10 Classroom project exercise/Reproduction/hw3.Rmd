@@ -1,0 +1,333 @@
+---
+title: "作業三：長期資料分析"
+author: "吳永健"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# 作業三：長期資料分析
+# 重製劉宗幸與江守峻（2020）
+
+# 前置準備
+
+```{r eval=FALSE}
+# 需要套件
+library(haven)
+library(dplyr)
+library(tidyr)
+library(lavaan)
+
+# 設定工作路徑
+setwd("D:/Dropbox/學習/碩士/碩一下/量化分析專題/hw/hw3/")
+
+# 讀入資料
+## J3W1
+w3 <- read_dta("TYP J1/w3/j1w3s_2009_限制版.dta", encoding = "Big5") 
+
+#J1W4
+w4 <- read_dta("TYP J1/w4/j1w4s_2009_限制版.dta", encoding = "Big5") 
+
+#J4W5
+w5 <- read_dta("TYP J1/w5/j1w5s_jan2010.dta", encoding = "Big5") 
+
+#J4W6
+w6 <- read_dta("TYP J1/w6/j1w6s_Jun2011(限制版).dta", encoding = "Big5") 
+```
+
+# 分析開始
+
+## 選取需要的變項
+```{r}
+# w3
+working_w3 <- c(
+              "id1",
+              #憂鬱
+              "cs919001", "cs919003", "cs919004", "cs919007", "cs919008", 
+              "cs919009", "cs919010",  
+               # 父親依附
+              "cs207f01", "cs207f02", "cs207f03", "cs207f07",
+              "cs207f08", "cs207f09",
+              # 母親依附
+              "cs207m01", "cs207m02", "cs207m03", "cs207m07",
+              "cs207m08", "cs207m09", 
+              #學校依附(反向:1、3)
+              "cs317001", "cs317002", "cs317003", "cs317004", 
+              #學校依附(反向:1、3)
+              "cs318001", "cs318002", "cs318003"  
+              )
+r_w3 <- w3[working_w3]
+
+#w4 
+working_w4 <- c(
+              "id1",
+              #憂鬱
+              "ds075001", "ds075002", "ds075003", "ds075004", "ds075005", 
+              "ds075006", "ds075007"
+              )
+r_w4 <- w4[working_w4]
+
+#w5 8 9
+working_w5 <- c(
+              "id1",
+              #憂鬱
+              "es119000", "es120000", "es121000", "es122000", "es123000", 
+              "es124000", "es125000"
+              )
+r_w5 <- w5[working_w5]
+#w6 9
+working_w6 <- c(
+              "id1",
+              #憂鬱
+              "fs609001", "fs609003", "fs609004", "fs609007", "fs609008", 
+              "fs609009", "fs609010"
+              )
+r_w6 <- w6[working_w6]
+
+# 刪除不需要使用的東西
+rm(w3, w4, w5, w6)
+rm(working_w3, working_w4, working_w5, working_w6)
+```
+
+## 建立變項
+### 變數定義：憂鬱症狀
+```{r}
+# w3
+r_w3 <- r_w3 %>% 
+  mutate(
+    #設定缺失值
+    depress_1 = case_match(cs919001, 9 ~ NA, .default = cs919001),
+    depress_2 = case_match(cs919003, 9 ~ NA, .default = cs919003),
+    depress_3 = case_match(cs919004, 9 ~ NA, .default = cs919004),
+    depress_4 = case_match(cs919007, 9 ~ NA, .default = cs919007),
+    depress_5 = case_match(cs919008, 9 ~ NA, .default = cs919008),
+    depress_6 = case_match(cs919009, 9 ~ NA, .default = cs919009),
+    depress_7 = case_match(cs919010, 9 ~ NA, .default = cs919010)
+    ) %>%
+  mutate(
+    #創建憂鬱量表(加總) 有缺失值其他還能加
+    depress_w3 = rowSums(select(., depress_1, depress_2, depress_3,
+                              depress_4, depress_5, depress_6,
+                              depress_7), na.rm = TRUE) 
+  )
+
+# w4
+r_w4 <- r_w4 %>% 
+  mutate(
+    #設定缺失值
+    depress_1 = case_match(ds075001, c(0, 8) ~ NA, .default = ds075001),
+    depress_2 = case_match(ds075002, c(0, 8) ~ NA, .default = ds075002),
+    depress_3 = case_match(ds075003, c(0, 8) ~ NA, .default = ds075003),
+    depress_4 = case_match(ds075004, c(0, 8) ~ NA, .default = ds075004),
+    depress_5 = case_match(ds075005, c(0, 8) ~ NA, .default = ds075005),
+    depress_6 = case_match(ds075006, c(0, 8) ~ NA, .default = ds075006),
+    depress_7 = case_match(ds075007, c(0, 8) ~ NA, .default = ds075007)
+    ) %>%
+  mutate(
+    #創建憂鬱量表(加總) 有缺失值其他還能加
+    depress_w4 = rowSums(select(., depress_1, depress_2, depress_3,
+                              depress_4, depress_5, depress_6,
+                              depress_7), na.rm = TRUE) 
+  )
+# w5
+r_w5 <- r_w5 %>% 
+  mutate(
+    #設定缺失值
+    depress_1 = case_match(es119000, c(8, 9) ~ NA, .default = es119000),
+    depress_2 = case_match(es120000, c(8, 9) ~ NA, .default = es120000),
+    depress_3 = case_match(es121000, c(8, 9) ~ NA, .default = es121000),
+    depress_4 = case_match(es122000, c(8, 9) ~ NA, .default = es122000),
+    depress_5 = case_match(es123000, c(8, 9) ~ NA, .default = es123000),
+    depress_6 = case_match(es124000, c(8, 9) ~ NA, .default = es124000),
+    depress_7 = case_match(es125000, c(8, 9) ~ NA, .default = es125000)
+    ) %>%
+  mutate(
+    #創建憂鬱量表(加總) 有缺失值其他還能加
+    depress_w5 = rowSums(select(., depress_1, depress_2, depress_3,
+                              depress_4, depress_5, depress_6,
+                              depress_7), na.rm = TRUE) 
+    )
+    
+# w6
+r_w6 <- r_w6 %>% 
+  mutate(
+    #設定缺失值
+    depress_1 = case_match(fs609001, 9 ~ NA, .default = fs609001),
+    depress_2 = case_match(fs609003, 9 ~ NA, .default = fs609003),
+    depress_3 = case_match(fs609004, 9 ~ NA, .default = fs609004),
+    depress_4 = case_match(fs609007, 9 ~ NA, .default = fs609007),
+    depress_5 = case_match(fs609008, 9 ~ NA, .default = fs609008),
+    depress_6 = case_match(fs609009, 9 ~ NA, .default = fs609009),
+    depress_7 = case_match(fs609010, 9 ~ NA, .default = fs609010)
+    ) %>%
+  mutate(
+    #創建憂鬱量表(加總) 有缺失值其他還能加
+    depress_w6 = rowSums(select(., depress_1, depress_2, depress_3,
+                              depress_4, depress_5, depress_6,
+                              depress_7), na.rm = TRUE) 
+  )
+```
+
+
+### 變數定義：解釋變項
+
+```{r}
+#父親依附
+r_w3 <- r_w3 %>% 
+  mutate(
+    #設定缺失值並反向編碼
+    attachment_f1 = 8 - case_match(cs207f01, c(0, 9) ~ NA, .default = cs207f01),
+    attachment_f2 = 8 - case_match(cs207f02, c(0, 9) ~ NA, .default = cs207f02),
+    attachment_f3 = 8 - case_match(cs207f03, c(0, 9) ~ NA, .default = cs207f03),
+    attachment_f7 = 8 - case_match(cs207f07, c(0, 9) ~ NA, .default = cs207f07),
+    attachment_f8 = 8 - case_match(cs207f08, c(0, 9) ~ NA, .default = cs207f08),
+    attachment_f9 = 8 - case_match(cs207f09, c(0, 9) ~ NA, .default = cs207f09)
+    ) %>%
+  mutate(
+    #創建父親依附量表(加總) 有缺失值其他還能加
+    attachment_f_w3 = rowSums(select(., attachment_f1, attachment_f2, 
+                              attachment_f3, attachment_f7, attachment_f8, 
+                              attachment_f9), na.rm = TRUE) 
+  )
+
+#母親依附
+r_w3 <- r_w3 %>% 
+  mutate(
+    #設定缺失值並反向編碼
+    attachment_m1 = 8 - case_match(cs207m01, c(0, 9) ~ NA, .default = cs207m01),
+    attachment_m2 = 8 - case_match(cs207m02, c(0, 9) ~ NA, .default = cs207m02),
+    attachment_m3 = 8 - case_match(cs207m03, c(0, 9) ~ NA, .default = cs207m03),
+    attachment_m7 = 8 - case_match(cs207m07, c(0, 9) ~ NA, .default = cs207m07),
+    attachment_m8 = 8 - case_match(cs207m08, c(0, 9) ~ NA, .default = cs207m08),
+    attachment_m9 = 8 - case_match(cs207m09, c(0, 9) ~ NA, .default = cs207m09)
+    ) %>%
+  mutate(
+    #創建母親依附量表(加總) 有缺失值其他還能加
+    attachment_m_w3 = rowSums(select(., attachment_m1, attachment_m2, 
+                              attachment_m3, attachment_m7, attachment_m8, 
+                              attachment_m9), na.rm = TRUE) 
+  )
+
+#同儕依附
+r_w3 <- r_w3 %>% 
+  mutate(
+    #設定缺失值 有缺失值其他還能加
+    attachment_c1 = case_match(cs317001, 9 ~ NA, .default = cs317001),
+    attachment_c2 = case_match(cs317002, 9 ~ NA, .default = cs317002),
+    attachment_c3 = case_match(cs317003, 9 ~ NA, .default = cs317003),
+    attachment_c4 = case_match(cs317004, 9 ~ NA, .default = cs317004)
+    ) %>%
+  mutate(
+    #反向 
+    attachment_c1 = 5 - attachment_c1,
+    attachment_c3 = 5 - attachment_c3,
+    #創建同儕依附量表(加總)
+    attachment_c_w3 = rowSums(select(., attachment_c1, attachment_c2, 
+                              attachment_c3, attachment_c4), na.rm = TRUE)
+  ) 
+
+#學校依附
+r_w3 <- r_w3 %>% 
+  mutate(
+    #設定缺失值
+    attachment_s1 = case_match(cs318001, 9 ~ NA, .default = cs318001),
+    attachment_s2 = case_match(cs318002, 9 ~ NA, .default = cs318002),
+    attachment_s3 = case_match(cs318003, 9 ~ NA, .default = cs318003)
+    ) %>%
+  mutate(
+    #反向 
+    attachment_s1 = 5 - attachment_s1,
+    attachment_s3 = 5 - attachment_s3,
+    #創建同儕依附量表(加總) 有缺失值其他還能加
+    attachment_s_w3 = rowSums(select(., attachment_s1, attachment_s2, 
+                              attachment_s3), na.rm = TRUE)
+  )
+
+```
+
+## 資料合併
+```{r}
+r_w3_a <- r_w3[c("id1", "depress_w3", "attachment_f_w3", "attachment_m_w3",
+               "attachment_c_w3", "attachment_s_w3")]
+r_w4_a <- r_w4[c("id1", "depress_w4")]
+r_w5_a <- r_w5[c("id1", "depress_w5")]
+r_w6_a <- r_w6[c("id1", "depress_w6")]
+
+analysis <- left_join(r_w3_a,  r_w4_a, by = "id1") # 保留左邊data的所有資料(id)
+analysis3 <- left_join(analysis,  r_w5_a, by = "id1")
+analysis4 <- left_join(analysis3,  r_w6_a, by = "id1")
+
+#寬轉長
+# analysis_long3 <- analysis3 %>% 
+#   pivot_longer(
+#     cols      = c(-id1, -attachment_f_w3, -attachment_m_w3, -attachment_c_w3,
+#                   -attachment_s_w3),
+#     names_to  = c(".value", "wave"),
+#     names_sep = "_"
+#   )
+# 
+# analysis_long4 <- analysis4 %>% 
+#   pivot_longer(
+#     cols      = c(-id1, -attachment_f_w3, -attachment_m_w3, -attachment_c_w3,
+#                   -attachment_s_w3),
+#     names_to  = c(".value", "wave"),
+#     names_sep = "_"
+#   )
+```
+
+# 資料分析
+
+## 原先文章表一、圖一、二
+```{r}
+# 表一及圖一
+model1 <- '
+intercept =~ 1*depress_w3 + 1*depress_w4 + 1*depress_w5
+slope =~ 0*depress_w3 + depress_w4 + 1*depress_w5
+'
+
+fit1 <-  growth(model1, data = analysis3, missing = 'fiml')
+summary(fit1, fit.measures=TRUE)
+
+# 圖二  （使用該fit1估計出來的參數0, 0.881,1）
+model2 <- '
+intercept =~ 1*depress_w3 + 1*depress_w4 + 1*depress_w5 
+slope =~ 0*depress_w3 + 0.881*depress_w4 + 1*depress_w5
+
+intercept ~ attachment_f_w3 + attachment_m_w3 + attachment_c_w3 
+             + attachment_s_w3
+slope ~ attachment_f_w3 + attachment_m_w3 + attachment_c_w3 
+             + attachment_s_w3
+'
+fit2 <-  growth(model2, data = analysis3, missing = 'fiml')
+summary(fit2, fit.measures = TRUE, standardized = TRUE) 
+
+```
+
+## 加入第六波資料後
+```{r}
+
+# new圖一表一
+model3 <- '
+intercept =~ 1*depress_w3 + 1*depress_w4 + 1*depress_w5 + 1*depress_w6 
+slope =~ 0*depress_w3 + depress_w4 + depress_w5 + 1*depress_w6 
+'
+
+fit3 <-  growth(model3, data = analysis4, missing = 'fiml')
+summary(fit3, fit.measures=TRUE)
+
+# new圖二  （使用該fit1估計出來的參數0, 7.425, 8.417, 1）
+model4 <- '
+intercept =~ 1*depress_w3 + 1*depress_w4 + 1*depress_w5 + 1*depress_w6 
+slope =~ 0*depress_w3 + 7.425*depress_w4 + 8.417*depress_w5  + 1*depress_w6 
+
+intercept ~ attachment_f_w3 + attachment_m_w3 + attachment_c_w3 
+             + attachment_s_w3
+slope ~ attachment_f_w3 + attachment_m_w3 + attachment_c_w3 
+             + attachment_s_w3
+'
+fit4 <-  growth(model4, data = analysis4, missing = 'fiml')
+summary(fit4, fit.measures = TRUE)
+
+```
+
+
+
